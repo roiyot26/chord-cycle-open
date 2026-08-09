@@ -149,9 +149,11 @@ function frame(nowMs: number): void {
   let pointer: { x: number; y: number } | null = null;
   let openness = 0;
 
+  let fresh = false;
   if (tracked) {
     hand = features.extract(tracked.landmarks, nowMs);
     if (hand) {
+      fresh = true;
       lastHand = hand;
       lastHandAt = nowMs;
     }
@@ -165,8 +167,12 @@ function frame(nowMs: number): void {
   if (hand) {
     openness = hand.openness;
 
-    if (hand.pinched && !pinchWasDown) latched = !latched;
-    pinchWasDown = hand.pinched;
+    // Latching only reacts to live readings. Replaying a coasted frame's pinch
+    // state would let a single dropout toggle the latch behind the player's back.
+    if (fresh) {
+      if (hand.pinched && !pinchWasDown) latched = !latched;
+      pinchWasDown = hand.pinched;
+    }
 
     const { cx, cy, radius } = renderer.wheelLayout;
     const p = renderer.project(hand.palm.x, hand.palm.y);

@@ -36,8 +36,17 @@ export const OPEN_CLOSED = 0.9;
 export const OPEN_FULL = 1.7;
 
 /** Pinch is considered closed below this thumb-tip→index-tip / palm-length ratio. */
-const PINCH_ON = 0.32;
+const PINCH_ON = 0.28;
 const PINCH_OFF = 0.42;
+/**
+ * How long a pinch must hold before it counts.
+ *
+ * Pinch drives latching, and a false positive there is the worst failure the app
+ * has: it silently freezes the chord and the instrument looks broken. A single
+ * bad frame — thumb occluded behind the palm, say — is enough to fake one, so a
+ * pinch has to survive a few frames before it is believed.
+ */
+const PINCH_HOLD_MS = 150;
 
 export interface HandFeatures {
   /** Palm centroid in normalized input-image coordinates. */
@@ -46,7 +55,7 @@ export interface HandFeatures {
   scale: number;
   /** 0 = fist, 1 = fully spread. */
   openness: number;
-  /** True while thumb and index are touching (hysteretic). */
+  /** True while thumb and index are held together (hysteretic, and debounced). */
   pinched: boolean;
   /** Smoothed landmarks, for drawing. */
   landmarks: Landmark[];
@@ -68,12 +77,15 @@ export class HandFeatureExtractor {
   private readonly palmFilter = new OneEuroPoint(1.0, 0.015);
   private readonly opennessFilter = new OneEuroFilter(1.6, 0.01);
   private readonly landmarkFilters = Array.from({ length: 21 }, () => new OneEuroPoint(1.6, 0.03));
+  private pinchRaw = false;
+  private pinchRawSince = 0;
   private pinched = false;
 
   reset(): void {
     this.palmFilter.reset();
     this.opennessFilter.reset();
     for (const f of this.landmarkFilters) f.reset();
+    this.pinchRaw = false;
     this.pinched = false;
   }
 
@@ -100,9 +112,14 @@ export class HandFeatureExtractor {
       (this.opennessFilter.filter(spread, timestampMs) - OPEN_CLOSED) / (OPEN_FULL - OPEN_CLOSED),
     );
 
-    // Schmitt trigger, so a pinch resting near the threshold does not chatter.
+    // Schmitt trigger, so a pinch resting near the threshold does not chatter,
+    // then a hold requirement on top so one bad frame cannot fake a pinch.
     const pinchRatio = dist(raw[THUMB_TIP], raw[INDEX_TIP]) / scale;
-    if (this.pinched ? pinchRatio > PINCH_OFF : pinchRatio < PINCH_ON) this.pinched = !this.pinched;
+    if (this.pinchRaw ? pinchRatio > PINCH_OFF : pinchRatio < PINCH_ON) {
+      this.pinchRaw = !this.pinchRaw;
+      this.pinchRawSince = timestampMs;
+    }
+    if (timestampMs - this.pinchRawSince >= PINCH_HOLD_MS) this.pinched = this.pinchRaw;
 
     const landmarks = raw.map((lm, i) => {
       const p = this.landmarkFilters[i].filter(lm.x, lm.y, timestampMs);

@@ -109,6 +109,29 @@ test("pinch is detected and does not chatter on an open hand", () => {
   assert.equal(relaxed.pinched, false);
 });
 
+test("a one-frame pinch glitch does not register", () => {
+  const extractor = new HandFeatureExtractor();
+  const open = makeHand(0.5, 0.5, { pinch: false });
+  const glitch = makeHand(0.5, 0.5, { pinch: true });
+
+  let now = 0;
+  const step = (lm: typeof open) => {
+    const out = extractor.extract(lm, now);
+    now += 1000 / 60;
+    return out;
+  };
+
+  for (let i = 0; i < 30; i++) step(open);
+  // A single bad frame — thumb momentarily occluded — must not latch anything.
+  assert.equal(step(glitch)?.pinched, false);
+  for (let i = 0; i < 5; i++) assert.equal(step(open)?.pinched, false);
+
+  // A deliberate pinch, held, still registers.
+  let held = false;
+  for (let i = 0; i < 30; i++) held = step(glitch)?.pinched ?? false;
+  assert.equal(held, true, "a sustained pinch should still be detected");
+});
+
 test("a degenerate detection is dropped rather than emitted as a wild value", () => {
   const extractor = new HandFeatureExtractor();
   const collapsed: Landmark[] = new Array(21).fill(null).map(() => ({ x: 0.5, y: 0.5, z: 0 }));
