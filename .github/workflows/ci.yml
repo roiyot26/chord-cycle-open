@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Only the WASM copy step — the tests and the typecheck do not need the
+      # hand-landmark model, so there is no reason to download 8 MB for them.
+      - run: node scripts/copy-mediapipe-assets.mjs
+
+      - run: npm run typecheck
+
+      - run: npm test
