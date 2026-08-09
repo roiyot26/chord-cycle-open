@@ -1,0 +1,27 @@
+{
+  "name": "chord-cycle-open",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A chord wheel you play with hand gestures in the browser.",
+  "scripts": {
+    "setup": "node scripts/copy-mediapipe-assets.mjs && node scripts/fetch-model.mjs",
+    "predev": "node scripts/copy-mediapipe-assets.mjs",
+    "prebuild": "node scripts/copy-mediapipe-assets.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
+    "tonal": "6.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.11",
+    "typescript": "7.0.2",
+    "vite": "8.2.1"
+  }
+}

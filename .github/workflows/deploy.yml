@@ -1,0 +1,61 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a run in progress finish rather than cancelling it — a half-deployed Pages
+# site is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/configure-pages@v5
+
+      - run: npm ci
+
+      # The MediaPipe WASM runtime and the hand-landmark model are generated,
+      # not committed, so they have to be fetched before the bundle is built.
+      - name: Cache hand-landmark model
+        uses: actions/cache@v4
+        with:
+          path: public/models
+          key: hand-landmarker-float16-v1
+
+      - run: npm run setup
+
+      - run: npm run build
+
+      - name: Fail if the model is missing from the bundle
+        run: test -s dist/models/hand_landmarker.task
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
