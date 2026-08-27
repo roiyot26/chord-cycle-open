@@ -9,10 +9,12 @@ export interface RenderState {
   selected: number;
   hovered: number;
   openness: number;
+  chordName: string;
   hand: HandFeatures | null;
   pointer: { x: number; y: number } | null;
   latched: boolean;
   tracking: boolean;
+  usingCamera: boolean;
 }
 
 export interface WheelLayout {
@@ -92,6 +94,15 @@ export class Renderer {
     return this.mapper.toCanvas(nx, ny);
   }
 
+  canvasPointFromClient(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = this.canvas.width / Math.max(rect.width, 1);
+    return {
+      x: (clientX - rect.left) * dpr,
+      y: (clientY - rect.top) * dpr,
+    };
+  }
+
   syncVideo(video: HTMLVideoElement): void {
     this.mapper.update(video.videoWidth, video.videoHeight, this.canvas.width, this.canvas.height);
   }
@@ -105,7 +116,7 @@ export class Renderer {
     ctx.fillStyle = "#0b0d12";
     ctx.fillRect(0, 0, w, h);
 
-    if (video.readyState >= 2) {
+    if (state.usingCamera && video.readyState >= 2) {
       const [dx, dy, dw, dh] = this.mapper.destRect;
       ctx.save();
       ctx.globalAlpha = 0.5;
@@ -117,30 +128,18 @@ export class Renderer {
 
     const count = state.slots.length;
     if (this.glow.length !== count) this.glow = new Array(count).fill(0);
-    // Frame-rate independent easing: a fixed per-frame fraction would make the
-    // wheel feel different on a 30 fps camera than on a 60 Hz one.
     const now = performance.now();
     const dt = this.lastDrawAt === null ? 1 / 60 : Math.min((now - this.lastDrawAt) / 1000, 0.1);
     this.lastDrawAt = now;
     const ease = 1 - Math.exp(-dt / 0.06);
     for (let i = 0; i < count; i++) {
-      const target = i === state.selected ? 1 : i === state.hovered ? 0.28 : 0;
+      const target = i === state.selected ? state.openness : i === state.hovered ? 0.22 : 0;
       this.glow[i] += (target - this.glow[i]) * ease;
     }
 
     this.drawWheel(state, count, cx, cy, radius);
-    if (state.hand) this.drawHand(state.hand);
-    if (state.pointer) this.drawPointer(state.pointer, state.selected >= 0);
-    this.drawMeter(state.openness, w, h);
-
-    if (!state.tracking) {
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.font = `500 ${Math.round(radius * 0.11)}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      // Below the wheel, but clamped inside the canvas on short viewports.
-      ctx.fillText("show a hand to the camera", cx, Math.min(cy + radius * 1.42, h - radius * 0.08));
-    }
+    if (state.hand && state.usingCamera) this.drawHand(state.hand);
+    if (state.pointer && state.tracking) this.drawPointer(state.pointer, state.selected >= 0);
 
     ctx.restore();
   }
@@ -149,7 +148,6 @@ export class Renderer {
     const { ctx } = this;
     if (count === 0) return;
     const wedge = TAU / count;
-    // Canvas angles run from 3 o'clock; the wheel's slot 0 sits at 12 o'clock.
     const toCanvasAngle = (a: number) => a - Math.PI / 2;
 
     for (let i = 0; i < count; i++) {
@@ -160,7 +158,7 @@ export class Renderer {
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, radius, start, start + wedge);
         ctx.closePath();
-        ctx.fillStyle = `rgba(90, 217, 240, ${0.14 + 0.5 * glow})`;
+        ctx.fillStyle = `rgba(90, 217, 240, ${0.1 + 0.62 * glow})`;
         ctx.fill();
       }
     }
@@ -197,13 +195,24 @@ export class Renderer {
       ctx.shadowBlur = 0;
     }
 
+    const hubR = radius * DEAD_ZONE;
     ctx.beginPath();
-    ctx.arc(cx, cy, radius * DEAD_ZONE, 0, TAU);
-    ctx.fillStyle = state.latched ? "rgba(90,217,240,0.45)" : "rgba(14,17,24,0.8)";
+    ctx.arc(cx, cy, hubR, 0, TAU);
+    const hubGlow = 0.22 + 0.55 * state.openness;
+    ctx.fillStyle = state.latched ? `rgba(90,217,240,${0.35 + 0.4 * state.openness})` : `rgba(14,17,24,${0.72 + 0.1 * state.openness})`;
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(90,217,240,${hubGlow})`;
+    ctx.lineWidth = 1.5 + 2 * state.openness;
     ctx.stroke();
+
+    const name = state.chordName || "·";
+    const hubSize = Math.max(13, Math.round(radius * (0.11 + 0.08 * state.openness)));
+    ctx.font = `700 ${hubSize}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillStyle = `rgba(238,242,247,${0.45 + 0.55 * Math.max(state.openness, state.selected >= 0 ? 0.35 : 0)})`;
+    ctx.shadowColor = "rgba(0,0,0,0.7)";
+    ctx.shadowBlur = 8;
+    ctx.fillText(name, cx, cy);
+    ctx.shadowBlur = 0;
   }
 
   private drawHand(hand: HandFeatures): void {
@@ -236,19 +245,5 @@ export class Renderer {
     ctx.strokeStyle = "rgba(0,0,0,0.45)";
     ctx.lineWidth = 2;
     ctx.stroke();
-  }
-
-  private drawMeter(openness: number, w: number, h: number): void {
-    const { ctx } = this;
-    const barW = Math.max(6, w * 0.008);
-    const barH = h * 0.32;
-    const x = w - barW * 4;
-    const y = (h - barH) / 2;
-
-    ctx.fillStyle = "rgba(255,255,255,0.14)";
-    ctx.fillRect(x, y, barW, barH);
-    ctx.fillStyle = ACCENT;
-    const filled = barH * openness;
-    ctx.fillRect(x, y + barH - filled, barW, filled);
   }
 }

@@ -78,9 +78,6 @@ export class Controls {
     this.bindRange("s-reverb", (v) => ({ ...this.config, engine: { ...this.config.engine, reverbMix: v } }));
     this.bindRange("s-bright", (v) => ({ ...this.config, engine: { ...this.config.engine, brightness: v } }));
     this.bindRange("s-detune", (v) => ({ ...this.config, engine: { ...this.config.engine, detuneCents: v } }));
-    this.bindRange("s-margin", (v) => ({ ...this.config, selector: { ...this.config.selector, edgeMargin: v } }));
-    this.bindRange("s-dwell", (v) => ({ ...this.config, selector: { ...this.config.selector, dwellMs: v } }));
-    this.bindRange("s-hold", (v) => ({ ...this.config, selector: { ...this.config.selector, minHoldMs: v } }));
 
     el<HTMLInputElement>("s-bass").addEventListener("change", (event) => {
       const checked = (event.currentTarget as HTMLInputElement).checked;
@@ -104,15 +101,12 @@ export class Controls {
   }
 
   private syncInputs(): void {
-    const { engine, selector } = this.config;
+    const { engine } = this.config;
     el<HTMLInputElement>("s-master").value = String(engine.masterGain);
     el<HTMLInputElement>("s-reverb").value = String(engine.reverbMix);
     el<HTMLInputElement>("s-bright").value = String(engine.brightness);
     el<HTMLInputElement>("s-detune").value = String(engine.detuneCents);
     el<HTMLInputElement>("s-bass").checked = engine.bassEnabled;
-    el<HTMLInputElement>("s-margin").value = String(selector.edgeMargin);
-    el<HTMLInputElement>("s-dwell").value = String(selector.dwellMs);
-    el<HTMLInputElement>("s-hold").value = String(selector.minHoldMs);
     this.presetSelect.value = PRESETS.some((p) => p.id === this.config.presetId) ? this.config.presetId : "custom";
   }
 

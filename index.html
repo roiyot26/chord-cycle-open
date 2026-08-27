@@ -2,12 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <title>Chord Cycle — play a chord wheel with your hands</title>
     <meta
       name="description"
-      content="A configurable chord wheel played with hand gestures: point to pick a chord, open your hand to swell."
+      content="A chord wheel you play in the browser. Point or touch a wedge to pick a chord; move out from the center to swell."
     />
   </head>
   <body>
@@ -15,34 +18,13 @@
       <video id="video" playsinline muted></video>
       <canvas id="canvas"></canvas>
 
-      <div class="hud">
-        <div class="hud-cell">
-          <span class="hud-label">Chord</span>
-          <span class="hud-value" id="hud-chord">—</span>
-        </div>
-        <div class="hud-cell">
-          <span class="hud-label">% Open</span>
-          <span class="hud-value" id="hud-open">0%</span>
-        </div>
-        <div class="hud-cell">
-          <span class="hud-label">Notes</span>
-          <span class="hud-value hud-value--small" id="hud-notes">—</span>
-        </div>
+      <div class="chrome">
+        <button class="hands-button" id="hands-button" type="button" aria-pressed="false">
+          Use hands
+        </button>
+        <span class="hands-status" id="hands-status"></span>
+        <button class="panel-toggle" id="panel-toggle" type="button" aria-expanded="false">Edit</button>
       </div>
-
-      <div class="start-overlay" id="start-overlay">
-        <div class="start-card">
-          <h1>Chord Cycle</h1>
-          <p>
-            Point your hand at a wedge to pick the chord. Open your hand to swell,
-            close it to fade out. Pinch to latch the current chord.
-          </p>
-          <button id="start-button" type="button">Enable camera &amp; audio</button>
-          <p class="start-status" id="start-status"></p>
-        </div>
-      </div>
-
-      <button class="panel-toggle" id="panel-toggle" type="button" aria-expanded="false">Wheel</button>
     </main>
 
     <aside class="panel" id="panel" hidden>
@@ -67,17 +49,6 @@
         <label class="field"><span>Brightness</span><input id="s-bright" type="range" min="800" max="9000" step="50" /></label>
         <label class="field"><span>Detune</span><input id="s-detune" type="range" min="0" max="24" step="1" /></label>
         <label class="field field--check"><span>Bass note</span><input id="s-bass" type="checkbox" /></label>
-      </section>
-
-      <section>
-        <h2>Feel</h2>
-        <label class="field"><span>Edge margin</span><input id="s-margin" type="range" min="0" max="0.6" step="0.01" /></label>
-        <label class="field"><span>Dwell (ms)</span><input id="s-dwell" type="range" min="0" max="400" step="10" /></label>
-        <label class="field"><span>Min hold (ms)</span><input id="s-hold" type="range" min="0" max="600" step="10" /></label>
-        <p class="hint">
-          Raise these if chords flicker as you cross a boundary; lower them if the
-          wheel feels sluggish.
-        </p>
         <button id="reset-config" type="button">Reset to defaults</button>
       </section>
     </aside>
